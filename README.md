@@ -1,72 +1,211 @@
-# TaraAI
+# TaraAI – Financial Intelligence Assistant
 
-Mastra-based finance analysis agent that answers questions using **tool-backed SQL** over your local database.
+## Overview
 
-> Key constraint: the agent is instructed to **never invent or estimate numbers** and to **only report values returned by tools**.
+TaraAI is an AI-powered financial assistant built using Mastra, Google Gemini, PostgreSQL, and Express.js.
+
+The system ingests transaction, holdings, fund, and NAV datasets into PostgreSQL and allows users to ask natural language questions about their finances through a single API endpoint.
+
+Examples:
+
+* What is my total spending?
+* Show spending by category.
+* Who are my top merchants?
+* Show my largest transactions.
+* What is my portfolio summary?
+* Show fund returns.
+
+---
+
+## Architecture
+
+Dataset Files (JSON)
+↓
+Ingestion Pipeline
+↓
+PostgreSQL Database
+↓
+Mastra Tools
+↓
+Finance Agent (Gemini)
+↓
+Express API
+↓
+POST /ask
+
+---
+
+## Technology Stack
+
+* Node.js
+* TypeScript
+* Express.js
+* PostgreSQL
+* Neon Database
+* Mastra AI Framework
+* Google Gemini 2.5 Flash
+* Render Deployment
+
+---
 
 ## Project Structure
-- `src/mastra/index.ts` — Mastra runtime + agent registration
-- `src/mastra/agents/finance-agent.ts` — Finance agent configuration (model + instructions + tools)
-- `src/mastra/db.ts` — PostgreSQL connection (`pg.Pool`) via `DATABASE_URL`
-- `src/mastra/tools/*` — SQL-backed tools
-- `src/mastra/schema.sql` — DB schema
-- `data/sample_*/*` — sample JSON datasets
-- `eval/*` — eval harness
 
-## Prerequisites
-- Node.js >= **22.13.0**
-- A database reachable via `DATABASE_URL`
+src/
+├── server.ts
+├── mastra/
+│   ├── agents/
+│   │   └── finance-agent.ts
+│   ├── tools/
+│   │   ├── financeTools.ts
+│   │   └── transactionAnalyticsTool.ts
+│   └── db.ts
 
-## Setup
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
-2. Configure environment variables:
-   - Create/edit `src/mastra/.env`
-   - Required: `DATABASE_URL`
+scripts/
+├── setup-db.ts
+└── ingest.ts
 
-   Example:
-   ```env
-   DATABASE_URL=postgres://USER:PASSWORD@HOST:PORT/DBNAME
-   ```
+data/
+└── sample_a/
 
-3. Initialize the database schema:
-   - Use `src/mastra/schema.sql` to create tables.
+---
 
-4. Load data (recommended for local testing):
-   - Use the sample datasets in `data/sample_a`, `data/sample_b`, `data/sample_c`.
-   - The ingest script(s) in the repo are intended for loading these into your DB.
+## Database Schema
 
+### transactions
 
-## Run (local dev)
-```bash
+* id
+* txn_date
+* merchant
+* merchant_canonical
+* category
+* amount
+* currency
+* memo
+
+### funds
+
+* fund_id
+* name
+* category
+
+### fund_navs
+
+* fund_id
+* nav_date
+* nav
+
+### holdings
+
+* id
+* fund_id
+* units
+* purchase_date
+* purchase_nav
+
+---
+
+## Environment Variables
+
+Create a .env file:
+
+DATABASE_URL=your_postgres_connection_string
+
+GOOGLE_GENERATIVE_AI_API_KEY=your_gemini_api_key
+
+PORT=3000
+
+---
+
+## Installation
+
+Install dependencies:
+
+npm install
+
+---
+
+## Database Setup
+
+Create tables:
+
+npx tsx .agents/skills/mastra/scripts/setup-db.ts
+
+Load data:
+
+npx tsx .agents/skills/mastra/scripts/ingest.ts
+
+Verify data:
+
+SELECT COUNT(*) FROM transactions;
+
+---
+
+## Running Locally
+
 npm run dev
-```
-- Mastra Studio + API will start locally.
 
-## Use the agent
-In Mastra Studio, chat with the registered `financeAgent`:
-- “How much did I spend in total?”
-- “Top merchants”
-- “Current portfolio by fund”
-- “Fund performance / returns”
+Server:
 
-## Tools
-The finance agent includes curated tools in:
-- `src/mastra/tools/financeTools.ts`
+http://localhost:3000
 
-It also includes generic SQL analytics tools (powerful):
-- `src/mastra/tools/transactionAnalyticsTool.ts`
-- `src/mastra/tools/holdingAnalyticsTool.ts`
-- `src/mastra/tools/portfolioAnalyticsTool.ts`
-- `src/mastra/tools/fundAnalyticsTool.ts`
+---
 
-## Notes / Known Issues
-- `src/mastra/workflows/financeWorkflow.ts` currently contains a **weather** workflow (not finance). It is not registered in `src/mastra/index.ts`.
-- During development, the DB must be reachable. If `DATABASE_URL` is missing, tool calls will fail.
+## API
 
-## Docs
-- `design.md` — architecture and data flow
-- `AGENTS.md` — Mastra skill loading and rules
+### POST /ask
 
+Request
+
+{
+"question": "What is my total spending?"
+}
+
+Response
+
+{
+"answer": "Your total spending is ..."
+}
+
+---
+
+## Deployment
+
+Base URL
+
+https://taraai-vwrk.onrender.com
+
+Endpoint
+
+POST https://taraai-vwrk.onrender.com/ask
+
+---
+
+## Example Queries
+
+What is my total spending?
+
+Show spending by category.
+
+Who are my top merchants?
+
+Show largest transactions.
+
+Show my portfolio summary.
+
+Show fund returns.
+
+---
+
+## Known Limitations
+
+* Render free tier may experience cold starts.
+* Response speed depends on Gemini API latency.
+* Financial insights are limited to the ingested dataset.
+* The system does not execute financial transactions.
+* Hidden datasets must follow the expected logical structure for ingestion.
+
+---
+
+## Author
+
+IRAM REHMAT ANSARI

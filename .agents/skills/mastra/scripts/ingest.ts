@@ -94,17 +94,17 @@ async function ingestTransactions() {
 
     await pool.query(
       `
-      INSERT INTO transactions
-      (
-        id,
-        date,
-        merchant,
-        canonical_merchant,
-        category,
-        amount,
-        currency,
-        memo
-      )
+     INSERT INTO transactions
+(
+  id,
+  txn_date,
+  merchant,
+  merchant_canonical,
+  category,
+  amount,
+  currency,
+  memo
+)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
       ON CONFLICT (id) DO NOTHING
       `,
@@ -161,13 +161,13 @@ async function ingestFunds() {
     await pool.query(
       `
       INSERT INTO funds
-      (
-        id,
-        name,
-        category
-      )
-      VALUES ($1,$2,$3)
-      ON CONFLICT (id) DO NOTHING
+(
+  fund_id,
+  name,
+  category
+)
+VALUES ($1,$2,$3)
+ON CONFLICT (fund_id) DO NOTHING
       `,
       [
         fundId,

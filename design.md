@@ -1,114 +1,278 @@
-# Design
+# TaraAI Design Document
 
-## Overview
-TaraAI is a **Mastra**-based agent project that answers finance questions using **tool-backed SQL** over a local database (Postgres/compatible via `pg`).
+## Problem Statement
 
-Core idea: the LLM should **not** guess—answers must come from deterministic tool output.
+Users often have financial data spread across transactions, holdings, and investment records. Extracting useful insights requires querying multiple datasets and manually calculating metrics.
 
-## Architecture
+TaraAI solves this by combining structured PostgreSQL queries with an AI agent capable of understanding natural language questions.
 
-### 1) Mastra runtime
-- `src/mastra/index.ts` instantiates `Mastra`.
-- Registers the `financeAgent`.
-- Configures Mastra storage (LibSQL default + DuckDB domain for observability).
+---
 
-### 2) Agent
-- `src/mastra/agents/finance-agent.ts`
-- Uses model: `google/gemini-2.5-flash`
-- Strong instructions: *never invent/estimate numbers*, *always use tools*, *only report tool output*.
-- Tools are SQL-backed and return DB rows.
+# Design Goals
 
-### 3) Tools (SQL execution)
-Two tool sets exist in the repo:
+1. Natural language financial querying.
+2. Reliable numerical accuracy.
+3. Separation of AI reasoning and data retrieval.
+4. Support for unseen datasets through normalization.
+5. Scalable architecture for future tools.
 
-#### A) Curated finance tools
-- `src/mastra/tools/financeTools.ts`
-- Exposes domain-specific helpers (total spending, spending by category, top merchants, portfolio value, fund performance, monthly spending, largest transactions).
+---
 
-#### B) Generic analytics tools
-- `src/mastra/tools/transactionAnalyticsTool.ts`
-- `src/mastra/tools/holdingAnalyticsTool.ts`
-- `src/mastra/tools/portfolioAnalyticsTool.ts`
-- `src/mastra/tools/fundAnalyticsTool.ts`
+# System Architecture
 
-These tools accept a `sql: string` input and return raw `rows`.
+User
+↓
+POST /ask
+↓
+Express Server
+↓
+Finance Agent
+↓
+Tool Selection
+↓
+PostgreSQL Queries
+↓
+Structured Results
+↓
+Gemini Response
+↓
+JSON Output
 
-> Note: In `finance-agent.ts`, both curated tools and the generic transaction tool are currently referenced.
+---
 
-### 4) Database layer
-- `src/mastra/db.ts`
-  - Creates a `pg.Pool` from `DATABASE_URL`.
-  - Logs whether `DATABASE_URL` exists.
+# Data Ingestion Strategy
 
-- `src/mastra/schema.sql`
-  - Defines required tables (transactions, holdings, funds, fund_navs, etc.).
+Incoming datasets may use different field names.
 
-### 5) Workflows
-- `src/mastra/workflows/financeWorkflow.ts`
-It is not wired to the finance agent in `src/mastra/index.ts`.
+Examples:
 
-### 6) Evals / scorers
-- `src/mastra/scorers/financeScorer.ts`
-  - Contains evaluation scaffolding (completeness, tool appropriateness, translation quality).
+transaction_date
+txn_date
+date
 
-- `eval/`
-  - Includes `questions.json` and `run-eval.ts` to run evaluations.
+merchant_name
+merchant
+vendor
 
-## Data & ingestion
+The ingestion layer normalizes these variations into a canonical schema before insertion into PostgreSQL.
 
-### Sample datasets
-- `data/sample_a/*`
-- `data/sample_b/*`
-- `data/sample_c/*`
+Example:
 
-These contain JSON files for `funds.json`, `holdings.json`, `transactions.json`.
+{
+"transaction_date": "2025-01-01",
+"vendor": "Amazon",
+"value": 500
+}
 
-### Ingest script
-- `src/mastra/scripts/ingest.ts` (in `.agents/skills/mastra/scripts/ingest.ts` as well, depending on your setup)
+becomes
 
-The intended flow:
-1. Load sample JSON.
-2. Normalize values (see `src/utils/Normalizer.ts`).
-3. Insert/update rows into the DB.
-4. Populate NAV history (`fund_navs`) so portfolio/fund return calculations work.
+{
+"txn_date": "2025-01-01",
+"merchant": "Amazon",
+"amount": 500
+}
 
-## Interaction flows
+This design improves robustness against unseen datasets.
 
-### Typical question: “How much did I spend?”
-1. User asks finance question.
-2. Agent selects `total-spending` tool.
-3. Tool runs SQL query.
-4. Agent returns `total_spending` from tool output.
+---
 
-### Typical question: “Top merchants”
-1. Agent calls `top-merchants`.
-2. SQL aggregates by `merchant`.
-3. Agent returns tool rows.
+# Database Design
 
-### Typical question: “Current portfolio”
-1. Agent calls `portfolio-summary`.
-2. SQL joins `holdings` + latest `fund_navs`.
-3. Agent returns fund-level values.
+## transactions
 
-## Security / correctness considerations
+Stores all spending activity.
 
-1. **Determinism over hallucination**
-   - Instructions enforce that answers must originate from tool output.
+Indexes:
 
-2. **SQL tool risk**
-   - The generic analytics tools that accept `sql` are powerful.
-   - In production, you should restrict/validate SQL to prevent destructive queries.
+* txn_date
+* category
+* merchant_canonical
+* amount
 
-3. **Environment configuration**
-   - The agent tools depend on `DATABASE_URL`.
-   - Without it, every tool call fails.
+Purpose:
 
-4. **Data freshness**
-   - NAV-derived calculations depend on `fund_navs` having recent records.
+Fast aggregation and filtering.
 
-## Suggested improvements (optional)
-- finance workflows are intended.
-- Wire all finance-related tools consistently.
-- Add SQL validation for `transactionAnalyticsTool` (and other generic sql tools).
-- Add a “healthcheck” tool that verifies DB connectivity + row counts before answering.
+---
 
+## funds
+
+Stores fund metadata.
+
+Purpose:
+
+Lookup and relationship management.
+
+---
+
+## fund_navs
+
+Stores historical NAV records.
+
+Purpose:
+
+Performance calculations and portfolio valuation.
+
+---
+
+## holdings
+
+Stores investment positions.
+
+Purpose:
+
+Portfolio analysis and return computation.
+
+---
+
+# AI Agent Design
+
+The Finance Agent uses Google Gemini 2.5 Flash.
+
+Responsibilities:
+
+* Understand user intent.
+* Select the correct tool.
+* Generate natural language responses.
+* Avoid hallucinating financial values.
+
+Rules:
+
+* Never invent numbers.
+* Always use tools for financial data.
+* Report only tool-generated values.
+
+---
+
+# Tool Design
+
+## totalSpendingTool
+
+Returns:
+
+SUM(amount)
+
+Use Cases:
+
+* Total spending
+* Overall expenses
+
+---
+
+## spendingByCategoryTool
+
+Returns:
+
+Category-wise aggregation.
+
+Use Cases:
+
+* Expense breakdown
+* Budget analysis
+
+---
+
+## topMerchantsTool
+
+Returns:
+
+Highest spending merchants.
+
+Use Cases:
+
+* Vendor analysis
+
+---
+
+## largestTransactionsTool
+
+Returns:
+
+Highest value transactions.
+
+Use Cases:
+
+* Spending audits
+
+---
+
+## portfolioSummaryTool
+
+Returns:
+
+Current value of holdings.
+
+Use Cases:
+
+* Portfolio overview
+
+---
+
+## fundReturnsTool
+
+Returns:
+
+Percentage returns for investments.
+
+Use Cases:
+
+* Performance analysis
+
+---
+
+# Performance Optimizations
+
+1. Database indexing.
+2. Aggregation performed in SQL.
+3. Minimal data transferred to the LLM.
+4. Tool-based retrieval instead of loading full datasets.
+5. Normalized merchant names.
+
+---
+
+# Error Handling
+
+Implemented for:
+
+* Missing questions.
+* Empty datasets.
+* Database failures.
+* API failures.
+* Invalid ingestion records.
+
+---
+
+# Deployment
+
+Hosting:
+
+* Render
+
+Database:
+
+* Neon PostgreSQL
+
+LLM:
+
+* Google Gemini 2.5 Flash
+
+API Endpoint:
+
+POST /ask
+
+---
+
+# Future Improvements
+
+* Multi-user support.
+* Authentication.
+* Spending trend forecasting.
+* Portfolio risk analytics.
+* Transaction categorization using machine learning.
+* Dashboard UI.
+
+---
+
+# Conclusion
+
+TaraAI combines structured financial data retrieval with AI-powered reasoning. The system prioritizes correctness by using database-backed tools and minimizes hallucination through strict agent instructions and tool-driven responses.
