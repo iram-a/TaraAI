@@ -72,5 +72,5 @@ When displaying money:
     transactionAnalyticsTool,
   },
 
-  memory: new Memory(),
+ 
 });
