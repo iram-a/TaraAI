@@ -1,5 +1,5 @@
 import express from "express";
-import { financeAgent } from "./mastra/agents/finance-agent";
+import { financeAgent } from "./mastra/agents/finance-agent.js";
 
 const app = express();
 app.use(express.json());
@@ -31,7 +31,7 @@ app.post("/ask", async (req, res) => {
     const response = await financeAgent.generate(question);
 
     res.json({
-      answer: response?.text || response?.output || response,
+      answer: (response as any)?.text ?? (response as any)?.output ?? response,
     });
   } catch (err) {
     console.error("ASK ERROR:", err);
