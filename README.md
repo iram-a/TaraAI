@@ -1,30 +1,72 @@
 # TaraAI
 
-Welcome to your new [Mastra](https://mastra.ai/) project! We're excited to see what you'll build.
+Mastra-based finance analysis agent that answers questions using **tool-backed SQL** over your local database.
 
-## Getting Started
+> Key constraint: the agent is instructed to **never invent or estimate numbers** and to **only report values returned by tools**.
 
-Start the development server:
+## Project Structure
+- `src/mastra/index.ts` — Mastra runtime + agent registration
+- `src/mastra/agents/finance-agent.ts` — Finance agent configuration (model + instructions + tools)
+- `src/mastra/db.ts` — PostgreSQL connection (`pg.Pool`) via `DATABASE_URL`
+- `src/mastra/tools/*` — SQL-backed tools
+- `src/mastra/schema.sql` — DB schema
+- `data/sample_*/*` — sample JSON datasets
+- `eval/*` — eval harness
 
-```shell
+## Prerequisites
+- Node.js >= **22.13.0**
+- A database reachable via `DATABASE_URL`
+
+## Setup
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Configure environment variables:
+   - Create/edit `src/mastra/.env`
+   - Required: `DATABASE_URL`
+
+   Example:
+   ```env
+   DATABASE_URL=postgres://USER:PASSWORD@HOST:PORT/DBNAME
+   ```
+
+3. Initialize the database schema:
+   - Use `src/mastra/schema.sql` to create tables.
+
+4. Load data (recommended for local testing):
+   - Use the sample datasets in `data/sample_a`, `data/sample_b`, `data/sample_c`.
+   - The ingest script(s) in the repo are intended for loading these into your DB.
+
+
+## Run (local dev)
+```bash
 npm run dev
 ```
+- Mastra Studio + API will start locally.
 
-Open [http://localhost:4111](http://localhost:4111) in your browser to access [Mastra Studio](https://mastra.ai/docs/studio/overview). It provides an interactive UI for building and testing your agents, along with a REST API that exposes your Mastra application as a local service. This lets you start building without worrying about integration right away.
+## Use the agent
+In Mastra Studio, chat with the registered `financeAgent`:
+- “How much did I spend in total?”
+- “Top merchants”
+- “Current portfolio by fund”
+- “Fund performance / returns”
 
-You can start editing files inside the `src/mastra` directory. The development server will automatically reload whenever you make changes.
+## Tools
+The finance agent includes curated tools in:
+- `src/mastra/tools/financeTools.ts`
 
-## Learn more
+It also includes generic SQL analytics tools (powerful):
+- `src/mastra/tools/transactionAnalyticsTool.ts`
+- `src/mastra/tools/holdingAnalyticsTool.ts`
+- `src/mastra/tools/portfolioAnalyticsTool.ts`
+- `src/mastra/tools/fundAnalyticsTool.ts`
 
-To learn more about Mastra, visit our [documentation](https://mastra.ai/docs/). Your bootstrapped project includes example code for [agents](https://mastra.ai/docs/agents/overview), [tools](https://mastra.ai/docs/agents/using-tools), [workflows](https://mastra.ai/docs/workflows/overview), [scorers](https://mastra.ai/docs/evals/overview), and [observability](https://mastra.ai/docs/observability/overview).
+## Notes / Known Issues
+- `src/mastra/workflows/financeWorkflow.ts` currently contains a **weather** workflow (not finance). It is not registered in `src/mastra/index.ts`.
+- During development, the DB must be reachable. If `DATABASE_URL` is missing, tool calls will fail.
 
-If you're new to AI agents, check out our [course](https://mastra.ai/learn) and [YouTube videos](https://youtube.com/@mastra-ai). You can also join our [Discord](https://discord.gg/BTYqqHKUrf) community to get help and share your projects.
+## Docs
+- `design.md` — architecture and data flow
+- `AGENTS.md` — Mastra skill loading and rules
 
-## Deploy to the Mastra platform
-
-The [Mastra platform](https://projects.mastra.ai) provides two products for deploying and managing AI applications built with the Mastra framework:
-
-- **Studio**: A hosted visual environment for testing agents, running workflows, and inspecting traces
-- **Server**: A production deployment target that runs your Mastra application as an API server
-
-Learn more in the [Mastra platform documentation](https://mastra.ai/docs/mastra-platform/overview).
