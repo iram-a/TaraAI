@@ -20,21 +20,24 @@ app.get("/", (req, res) => {
 app.post("/ask", async (req, res) => {
   const { question } = req.body;
 
-  console.log("QUESTION:", question);
-
   try {
-    console.log("Calling agent...");
-
     const response = await financeAgent.generate(question);
 
-    console.log("Agent returned");
+    console.log("AGENT RESPONSE:");
+    console.dir(response, { depth: null });
 
     res.json({
-      answer: response,
+      answer:
+        (response as any)?.text ??
+        (response as any)?.output ??
+        JSON.stringify(response),
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "failed" });
+
+    res.status(500).json({
+      error: "Agent failed",
+    });
   }
 });
 /**
